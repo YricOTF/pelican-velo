@@ -8,17 +8,21 @@
   --muted: #a5b8ad;
   --line: #394840;
   --glass: #172a25df;
+  --edge-top: env(safe-area-inset-top, 0px);
+  --edge-right: env(safe-area-inset-right, 0px);
+  --edge-bottom: env(safe-area-inset-bottom, 0px);
+  --edge-left: env(safe-area-inset-left, 0px);
 }
 
 *, *::before, *::after { box-sizing: border-box; }
-body { margin: 0; min-width: 280px; }
-button { font: inherit; cursor: pointer; }
+body { margin: 0; min-width: 280px; -webkit-text-size-adjust: 100%; }
+button { font: inherit; cursor: pointer; touch-action: manipulation; -webkit-tap-highlight-color: transparent; }
 button:disabled { cursor: default; }
 button:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
 [hidden] { display: none !important; }
 [data-icon] svg { display: block; width: 18px; height: 18px; }
 
-.shell { width: min(100% - 72px, 1256px); margin-inline: auto; }
+.shell { width: min(100% - 72px, 1256px); margin-inline: auto; padding-top: var(--edge-top); padding-bottom: var(--edge-bottom); }
 .header { display: flex; align-items: center; justify-content: space-between; padding-block: 15px; border-bottom: 1px solid var(--line); }
 .wordmark { display: flex; align-items: center; gap: 10px; font-size: 18px; font-weight: 700; letter-spacing: -.065em; }
 .wordmark-accent { color: var(--accent); margin-left: 3px; }
@@ -112,6 +116,7 @@ h1 span { margin-left: .06em; color: var(--accent); }
 .tool-button svg { width: 17px; height: 17px; }
 .status-stack { position: absolute; bottom: 19px; left: 50%; transform: translateX(-50%); display: flex; flex-direction: column; align-items: center; gap: 5px; width: max-content; max-width: calc(100% - 200px); pointer-events: none; }
 .status-stack > div { border-radius: 999px; padding: 6px 11px; text-align: center; font-size: 12px; line-height: 1.4; font-weight: 650; }
+.traffic-warning { background: #ffdeab; color: #492a18; }
 .offroad { background: #fff0bf; color: #453725; }
 .toast { background: var(--accent); color: #25352a; }
 
@@ -164,10 +169,12 @@ h1 span { margin-left: .06em; color: var(--accent); }
   color: #eef5e9;
   font-size: 12px;
   font-weight: 650;
+  -webkit-user-select: none;
   user-select: none;
   touch-action: none;
   -webkit-touch-callout: none;
 }
+.drive > span { pointer-events: none; }
 .drive svg { width: 19px; height: 19px; stroke-width: 2.15; }
 .brake { color: #ffdcbf; border-color: #90684f; background: #463a2f; }
 .throttle { background: var(--accent); color: #182719; border-color: #d2f36f; }
@@ -195,14 +202,21 @@ kbd { font-family: inherit; padding: 1px 5px; border: 1px solid #4f6256; border-
   .touch-copy { display: inline; }
 }
 @media (max-width: 700px) {
-  .shell { width: calc(100% - 28px); }
+  .shell {
+    width: auto;
+    margin-left: max(14px, var(--edge-left));
+    margin-right: max(14px, var(--edge-right));
+  }
   .header { padding-block: 10px; }
   .intro { margin: 14px 0 13px; }
   .route-meta { gap: 5px; font-size: 11px; margin-bottom: 2px; }
   .route-meta svg { width: 13px; height: 13px; }
   .route-length { min-width: 0; }
   .ride-panel { border-radius: 13px; }
-  .stage { height: clamp(350px, 54svh, 500px); }
+  .stage {
+    height: 390px;
+    height: clamp(240px, calc(100svh - 232px - var(--edge-top) - var(--edge-bottom)), 485px);
+  }
   .instrument { top: 9px; left: 9px; width: 106px; padding: 7px; border-radius: 10px; }
   .gauge > :first-child { font-size: 32px; }
   .instrument-row { font-size: 10px; }
@@ -224,10 +238,19 @@ kbd { font-family: inherit; padding: 1px 5px; border: 1px solid #4f6256; border-
 }
 @media (max-width: 339px) { .route-meta > :nth-child(2) { display: none; } }
 @media (max-height: 560px) and (orientation: landscape) and (pointer: coarse) {
-  .shell { width: calc(100% - 16px); }
+  .shell {
+    width: auto;
+    margin-left: max(9px, var(--edge-left));
+    margin-right: max(9px, var(--edge-right));
+  }
   .header, .intro, .footer { display: none; }
   .ride-panel { margin-top: 5px; }
-  .stage { height: max(225px, calc(100svh - 77px)); }
+  .instrument { top: 9px; left: 11px; width: 111px; }
+  .map { top: 9px; right: 11px; width: 90px; }
+  .stage {
+    height: 225px;
+    height: max(176px, calc(100svh - 76px - var(--edge-top) - var(--edge-bottom)));
+  }
   .control-dock { padding-block: 5px; }
 }
 

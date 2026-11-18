@@ -46,6 +46,7 @@ const timeReadout = byId('lap-time');
 const bestReadout = byId('best-time');
 const progressReadout = byId('lap-progress');
 const offroad = byId('offroad');
+const trafficWarning = byId('traffic-warning');
 const toast = byId('toast');
 const minimap = byId('minimap');
 const controls = [...document.querySelectorAll('[data-drive]')];
@@ -124,7 +125,7 @@ function createMinimap(points) {
   path.moveTo(mapX(first.x), mapY(first.z));
   for (const point of points.slice(1)) path.lineTo(mapX(point.x), mapY(point.z));
   path.closePath();
-  return ({ position, heading }) => {
+  return ({ position, heading }, cars) => {
     ctx.clearRect(0, 0, minimap.width, minimap.height);
     ctx.fillStyle = '#c3eee721';
     ctx.fill(path);
@@ -138,6 +139,12 @@ function createMinimap(points) {
     ctx.setLineDash([]);
     ctx.fillStyle = '#f1f1da';
     ctx.fillRect(mapX(first.x) - 2, mapY(first.z) - 4, 4, 8);
+    ctx.fillStyle = '#ffba9b';
+    for (const car of cars) {
+      ctx.beginPath();
+      ctx.arc(mapX(car.position.x), mapY(car.position.z), 2.2, 0, 2 * Math.PI);
+      ctx.fill();
+    }
     ctx.save();
     ctx.translate(mapX(position.x), mapY(position.z));
     ctx.rotate(heading);
@@ -156,14 +163,15 @@ function createMinimap(points) {
   };
 }
 
-function showState(state) {
+function showState(state, cars) {
   setText(speedReadout, String(Math.round(state.speed * 3.6)));
   setText(lapReadout, `${state.laps} 圈`);
   setText(timeReadout, formatTime(state.lapTime));
   setText(bestReadout, state.bestLap === null ? '—' : formatTime(state.bestLap, true));
   setText(progressReadout, `${Math.floor(state.progress * 100)}%`);
-  offroad.hidden = !state.offroad;
-  map?.(state);
+  trafficWarning.hidden = !state.yielding;
+  offroad.hidden = !state.offroad || state.yielding;
+  map?.(state, cars);
 
   if (state.laps > laps) showToast(`完成第 ${state.laps} 圈 · ${formatTime(state.lastLap, true)}`);
   if (state.respawns > respawns) showToast('已回到公路');
@@ -192,9 +200,14 @@ document.addEventListener('keydown', (event) => {
     setMode(mode === 'playing' ? 'paused' : 'playing', true);
   }
 }, options);
+function pauseOnExit() {
+  if (mode === 'playing') setMode('paused');
+}
+
 document.addEventListener('visibilitychange', () => {
-  if (document.hidden && mode === 'playing') setMode('paused');
+  if (document.hidden) pauseOnExit();
 }, options);
+window.addEventListener('pagehide', pauseOnExit, options);
 
 try {
   const { createRideScene } = await import('./ride-scene.js');

@@ -1,8 +1,10 @@
 import * as THREE from 'three';
 import { createBicycle } from './bicycle.js';
+import { createCar } from './car.js';
 import { createPelican } from './pelican.js';
 import { createIsland } from './island.js';
 import { createRidePhysics } from './ride-physics.js';
+import { createTraffic } from './traffic.js';
 
 const step = 1 / 120;
 const tau = Math.PI * 2;
@@ -34,12 +36,15 @@ function createContactShadow() {
 
 export function createRideScene(viewport, { getInput, onState, onContextStatus }) {
   const scene = new THREE.Scene();
-  scene.fog = new THREE.FogExp2(0xade4cf, 0.012);
-  const camera = new THREE.PerspectiveCamera(48, 1, 0.12, 260);
-  const renderer = new THREE.WebGLRenderer({ alpha: true, antialias: true, powerPreference: 'default' });
+  scene.fog = new THREE.FogExp2(0xade4cf, .009);
+  const camera = new THREE.PerspectiveCamera(48, 1, 0.2, 420);
+  const appleTouch = /iPhone|iPad|iPod/.test(navigator.userAgent)
+    || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
   const coarsePointer = window.matchMedia('(pointer: coarse)').matches;
   const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-  renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, coarsePointer ? 1.35 : 1.6));
+  const renderer = new THREE.WebGLRenderer({ alpha: true, antialias: !appleTouch, powerPreference: 'default' });
+  const mobilePixelBudget = appleTouch ? 640_000 : 830_000;
+  const pixelRatioLimit = appleTouch ? 1.35 : coarsePointer ? 1.4 : 1.7;
   renderer.setClearColor(0x000000, 0);
   renderer.outputColorSpace = THREE.SRGBColorSpace;
   renderer.toneMapping = THREE.ACESFilmicToneMapping;
@@ -54,7 +59,13 @@ export function createRideScene(viewport, { getInput, onState, onContextStatus }
   scene.add(ambient, key, rim);
 
   const island = createIsland();
-  const physics = createRidePhysics(island.curve, island.roadWidth);
+  const traffic = createTraffic(island.curve, island.roadWidth);
+  const physics = createRidePhysics(island.curve, island.roadWidth, traffic);
+  const trafficModels = traffic.cars.map((car) => {
+    const model = createCar(car.style);
+    scene.add(model.group);
+    return model;
+  });
   const bicycle = createBicycle();
   const pelican = createPelican();
   const lean = new THREE.Group();
@@ -84,6 +95,10 @@ export function createRideScene(viewport, { getInput, onState, onContextStatus }
   let contextLost = false;
   let snapCamera = true;
   let previousRespawns = physics.state.respawns;
+  let canvasWidth = 0;
+  let canvasHeight = 0;
+  let canvasRatio = 0;
+  const trafficDrawDistance = coarsePointer ? 94 : 136;
 
   function requestFrame() {
     if (frame || !visible || document.hidden || contextLost) return;
@@ -98,7 +113,7 @@ export function createRideScene(viewport, { getInput, onState, onContextStatus }
     const rightZ = forwardX;
     const narrow = camera.aspect < 1;
     if (mode === 'ready') {
-      const side = narrow ? 4.65 : 4.55;
+      const side = narrow ? -4.65 : -4.55;
       const advance = narrow ? 3.6 : 2.45;
       cameraGoal.set(
         viewOrigin.x + forwardX * advance + rightX * side,
@@ -146,6 +161,7 @@ export function createRideScene(viewport, { getInput, onState, onContextStatus }
       const input = getInput();
       while (accumulator >= step) {
         physics.update(step, input);
+        traffic.update(step, state);
         steppedTime += step;
         accumulator -= step;
         wheelAngle = (wheelAngle - state.speed * step / .47) % tau;
@@ -158,7 +174,7 @@ export function createRideScene(viewport, { getInput, onState, onContextStatus }
     }
 
     if (now >= nextReport) {
-      onState(state);
+      onState(state, traffic.cars);
       nextReport = now + 85;
     }
     rider.position.copy(state.position);
@@ -170,6 +186,15 @@ export function createRideScene(viewport, { getInput, onState, onContextStatus }
     pelican.update(steppedTime, crankAngle, state.speed / 12);
     island.update(steppedTime, weather);
     updateCamera(delta);
+    for (let index = 0; index < traffic.cars.length; index += 1) {
+      const car = traffic.cars[index];
+      const model = trafficModels[index];
+      model.group.visible = car.position.distanceToSquared(camera.position) < trafficDrawDistance ** 2;
+      if (!model.group.visible) continue;
+      model.group.position.copy(car.position);
+      model.group.rotation.y = -car.heading;
+      model.update(car.distance, car.braking);
+    }
     renderer.render(scene, camera);
     if (viewport.dataset.ready !== 'true') viewport.dataset.ready = 'true';
     if (mode === 'playing') requestFrame();
@@ -186,11 +211,18 @@ export function createRideScene(viewport, { getInput, onState, onContextStatus }
   function resize() {
     const { clientWidth: width, clientHeight: height } = viewport;
     if (!width || !height) return;
+    const budgetRatio = appleTouch || coarsePointer ? Math.sqrt(mobilePixelBudget / (width * height)) : Infinity;
+    const ratio = Math.min(window.devicePixelRatio || 1, pixelRatioLimit, budgetRatio);
+    if (width === canvasWidth && height === canvasHeight && ratio === canvasRatio) return;
+    const narrow = width < height;
+    if (!canvasWidth || narrow !== (canvasWidth < canvasHeight)) snapCamera = true;
+    canvasWidth = width;
+    canvasHeight = height;
+    canvasRatio = ratio;
     camera.aspect = width / height;
-    camera.fov = camera.aspect < 1 ? 58 : 48;
+    camera.fov = narrow ? 58 : 48;
     camera.updateProjectionMatrix();
-    renderer.setSize(width, height, false);
-    snapCamera = true;
+    renderer.setDrawingBufferSize(width, height, ratio);
     requestFrame();
   }
 
@@ -222,13 +254,14 @@ export function createRideScene(viewport, { getInput, onState, onContextStatus }
   });
   visibilityObserver.observe(viewport);
   document.addEventListener('visibilitychange', onVisibilityChange);
+  window.addEventListener('pageshow', resize);
   renderer.domElement.addEventListener('webglcontextlost', handleContextLoss);
   renderer.domElement.addEventListener('webglcontextrestored', handleContextRestore);
   resize();
 
   return {
     length: island.curve.getLength(),
-    route: island.curve.getSpacedPoints(128),
+    route: island.curve.getSpacedPoints(240),
     setMode(nextMode) {
       if (mode === 'ready' && nextMode !== 'ready') snapCamera = true;
       mode = nextMode;
@@ -257,6 +290,7 @@ export function createRideScene(viewport, { getInput, onState, onContextStatus }
       sizeObserver.disconnect();
       visibilityObserver.disconnect();
       document.removeEventListener('visibilitychange', onVisibilityChange);
+      window.removeEventListener('pageshow', resize);
       renderer.domElement.removeEventListener('webglcontextlost', handleContextLoss);
       renderer.domElement.removeEventListener('webglcontextrestored', handleContextRestore);
       renderer.domElement.remove();
@@ -269,6 +303,9 @@ export function createRideScene(viewport, { getInput, onState, onContextStatus }
           if (!material) continue;
           materials.add(material);
           for (const value of Object.values(material)) if (value?.isTexture) textures.add(value);
+          for (const uniform of Object.values(material.uniforms ?? {})) {
+            if (uniform.value?.isTexture) textures.add(uniform.value);
+          }
         }
       });
       for (const geometry of geometries) geometry.dispose();

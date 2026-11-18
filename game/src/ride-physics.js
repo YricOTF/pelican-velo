@@ -53,7 +53,7 @@ function projectOntoRoad(position, segments, projection) {
   projection.distance = Math.sqrt(nearestDistanceSquared);
 }
 
-export function createRidePhysics(curve, roadWidth) {
+export function createRidePhysics(curve, roadWidth, traffic) {
   const length = curve.getLength();
   const halfWidth = roadWidth / 2;
   const segments = sampleRoad(curve, length);
@@ -63,6 +63,7 @@ export function createRidePhysics(curve, roadWidth) {
     speed: 0,
     steer: 0,
     offroad: false,
+    yielding: false,
     progress: 0,
     trackHeading: 0,
     trackOffset: 0,
@@ -78,20 +79,34 @@ export function createRidePhysics(curve, roadWidth) {
   const projection = { progress: 0, offset: 0, heading: 0, y: 0, distance: 0 };
   const lookAhead = new Vector3();
   const tangent = new Vector3();
+  const spawn = new Vector3();
+  const spawnOffsets = [0, -roadWidth * 0.065, roadWidth * 0.065, -roadWidth * 0.13, roadWidth * 0.13];
   let safeProgress = 0;
   let nextSector = 1;
   let lapStartedAt = 0;
 
   function placeOnRoad(progress) {
-    curve.getPointAt(progress, state.position);
-    curve.getTangentAt(progress, tangent);
-    state.heading = Math.atan2(tangent.z, tangent.x);
-    state.trackHeading = state.heading;
-    state.progress = progress;
-    state.trackOffset = 0;
     state.speed = 0;
     state.steer = 0;
-    state.offroad = false;
+    state.yielding = false;
+
+    for (let retreat = 0; retreat < length; retreat += 1.35) {
+      const location = wrap(progress - retreat / length);
+      curve.getPointAt(location, lookAhead);
+      curve.getTangentAt(location, tangent);
+      const heading = Math.atan2(tangent.z, tangent.x);
+      for (const offset of spawnOffsets) {
+        spawn.set(lookAhead.x - tangent.z * offset, lookAhead.y, lookAhead.z + tangent.x * offset);
+        if (traffic && !traffic.isClear(spawn, heading)) continue;
+        state.position.copy(spawn);
+        state.heading = heading;
+        state.trackHeading = heading;
+        state.progress = location;
+        state.trackOffset = offset;
+        state.offroad = false;
+        return;
+      }
+    }
   }
 
   function reset() {
@@ -157,19 +172,31 @@ export function createRidePhysics(curve, roadWidth) {
     const sandResistance = state.offroad ? 2.8 + state.speed * 0.36 : 0;
     const brakingForce = brake * (10.2 + state.speed * 0.25);
     const acceleration = pedalForce - rollingResistance - sandResistance - brakingForce;
-    state.speed = clamp(state.speed + acceleration * dt, 0, TOP_SPEED);
-    const travel = state.speed * dt;
-    if (travel === 0) return state;
+    const speed = clamp(state.speed + acceleration * dt, 0, TOP_SPEED);
+    const requestedTravel = speed * dt;
+    const maneuvering = state.yielding && Math.abs(state.steer) > 0.05;
+    if (requestedTravel === 0 && !maneuvering) {
+      state.speed = 0;
+      state.yielding = false;
+      return state;
+    }
 
-    const steeringPower = 1.82 * state.speed / (state.speed + 3.8);
-    const lookAheadDistance = 2.8 + state.speed * 0.28;
+    // Allow the rider to point the bike around a vehicle while yielding at a standstill.
+    const steeringPower = Math.max(maneuvering ? 0.44 : 0, 1.82 * speed / (speed + 3.8));
+    const lookAheadDistance = 2.8 + speed * 0.28;
     curve.getPointAt(wrap(state.progress + lookAheadDistance / length), lookAhead);
     const desiredHeading = Math.atan2(lookAhead.z - state.position.z, lookAhead.x - state.position.x);
     const roadError = angleDifference(desiredHeading, state.heading);
-    const blending = clamp((state.speed - 2) / 7, 0, 1) * (1 - Math.min(1, Math.abs(state.steer) * 1.4));
+    const blending = clamp((speed - 2) / 7, 0, 1) * (1 - Math.min(1, Math.abs(state.steer) * 1.4));
     const ridingForward = Math.abs(angleDifference(state.trackHeading, state.heading)) < Math.PI * 0.55;
     const assist = ridingForward && !state.offroad ? clamp(roadError * 0.54, -0.29, 0.29) * blending : 0;
-    state.heading = angleDifference(state.heading + (steeringPower * state.steer + assist) * dt, 0);
+    const heading = angleDifference(state.heading + (steeringPower * state.steer + assist) * dt, 0);
+    const movement = traffic?.limitTravel(state, heading, requestedTravel, dt);
+    const travel = movement?.travel ?? requestedTravel;
+    state.heading = movement?.heading ?? heading;
+    state.yielding = movement?.yielding ?? false;
+    state.speed = travel / dt;
+    if (travel === 0) return state;
     state.position.x += Math.cos(state.heading) * travel;
     state.position.z += Math.sin(state.heading) * travel;
     state.distance += travel;

@@ -3,13 +3,13 @@
 <html lang="zh-CN">
   <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
     <meta name="theme-color" content="#131a18">
-    <meta name="description" content="操控鹈鹕骑上单车，沿着海风环线绕岛一圈。支持手机触控与电脑键盘。">
+    <meta name="description" content="操控鹈鹕骑上单车，沿海岛公路避让车辆，骑完海风环线。支持手机触控与电脑键盘。">
     <link rel="icon" type="image/png" href="./favicon.png">
     <title>鹈鹕骑行 · 海风环线</title>
-    <script type="module" crossorigin src="./pages-assets/index-BipZGomM.js"></script>
-    <link rel="stylesheet" crossorigin href="./pages-assets/index-nYo_C9Ti.css">
+    <script type="module" crossorigin src="./pages-assets/index-BgG2L-A8.js"></script>
+    <link rel="stylesheet" crossorigin href="./pages-assets/index-B2vpyXBc.css">
   </head>
   <body>
     <main class="shell">
@@ -61,13 +61,14 @@
 
             <div class="status-stack" aria-live="polite">
               <div class="toast" id="toast" hidden></div>
+              <div class="traffic-warning" id="traffic-warning" hidden>前方有车 · 自动减速</div>
               <div class="offroad" id="offroad" hidden>已离开公路 · 沙地减速</div>
             </div>
 
             <div class="brief" id="brief">
               <div>
                 <h2 id="brief-title">准备出发</h2>
-                <p id="brief-copy"><span class="desktop-copy">用方向键或 WASD 控车，沿海岸骑完一圈。</span><span class="touch-copy">按住踏板加速，用方向键转弯。</span></p>
+                <p id="brief-copy"><span class="desktop-copy">用方向键或 WASD 控车，留意来往车辆。</span><span class="touch-copy">按住踩踏加速，同时按左转或右转。</span></p>
               </div>
               <button id="start" class="primary" type="button" disabled>
                 <span data-icon="play" aria-hidden="true"></span><span id="start-label">正在加载</span>

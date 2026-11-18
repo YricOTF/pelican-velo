@@ -5,6 +5,7 @@ export default defineConfig({
   publicDir: '../public',
   base: './',
   build: {
+    target: ['chrome107', 'edge107', 'firefox104', 'safari15'],
     outDir: '../dist',
     emptyOutDir: true,
     assetsDir: 'pages-assets',
