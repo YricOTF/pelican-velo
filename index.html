@@ -1,0 +1,85 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="theme-color" content="#131a18">
+    <meta name="description" content="跟着鹈鹕沿海兜风。可以拖动、缩放和控制骑行速度的 3D 小场景。">
+    <link rel="icon" type="image/png" href="/favicon.png">
+    <title>鹈鹕骑行 · Pelican Velo</title>
+  </head>
+  <body>
+    <main class="shell">
+      <header class="header">
+        <div class="wordmark">
+          <span class="brand-icon" data-icon="bird" aria-hidden="true"></span>
+          <span>PELICAN<span class="wordmark-accent">VELO</span></span>
+        </div>
+        <button type="button" class="weather" id="weather" aria-label="切换为日落场景">
+          <span class="weather-icons" aria-hidden="true">
+            <span class="weather-icon weather-day" data-icon="sun"></span>
+            <span class="weather-icon weather-sunset" data-icon="sunset"></span>
+          </span>
+          <span id="weather-label">晴天</span>
+        </button>
+      </header>
+
+      <section class="ride" aria-labelledby="ride-title">
+        <div class="intro">
+          <div>
+            <p class="edition"><span></span> LA BALADE CÔTIÈRE</p>
+            <h1 id="ride-title">鹈鹕骑行<span>.</span></h1>
+          </div>
+          <p class="description">沿海慢骑，<br class="desktop-break">看看风把鹈鹕带去哪里。</p>
+        </div>
+
+        <div class="ride-panel">
+          <div id="stage" class="stage">
+            <div class="backdrop" aria-hidden="true">
+              <div class="sun"></div>
+              <div class="sky-line sky-line-one"></div>
+              <div class="sky-line sky-line-two"></div>
+              <div class="sky-line sky-line-three"></div>
+              <div class="water-horizon"></div>
+            </div>
+            <div id="viewport" class="viewport" role="img" aria-label="一只戴护目镜和围巾的鹈鹕，骑着复古单车沿海兜风">
+              <img class="fallback-image" src="/pelican-poster.webp" width="510" height="459" alt="">
+            </div>
+            <div class="stage-caption" aria-hidden="true">
+              <span data-icon="map-pin"></span>
+              <span>海风小径</span>
+            </div>
+            <div class="stage-tools">
+              <button type="button" class="icon-button" id="reset" aria-label="重置视角" title="重置视角" data-icon="rotate-ccw"></button>
+            </div>
+            <div class="stage-hint"><span data-icon="move" aria-hidden="true"></span><span class="pointer-hint">拖动旋转 · 滚轮缩放</span><span class="touch-hint">单指旋转 · 双指缩放</span></div>
+          </div>
+
+          <div class="dashboard" aria-label="骑行控制">
+            <div class="playback">
+              <button type="button" id="playback" class="playback-button" aria-label="暂停骑行" title="暂停骑行">
+                <span id="play-icon" data-icon="play" hidden></span>
+                <span id="pause-icon" data-icon="pause"></span>
+              </button>
+              <span class="playback-state" id="playback-state" aria-live="polite">骑行中</span>
+            </div>
+
+            <div class="speed">
+              <label for="speed">速度</label>
+              <input id="speed" type="range" min="4" max="32" value="16" step="1" aria-valuetext="16 公里/小时">
+              <div class="speed-reading"><output id="speed-value" for="speed">16</output><span>km/h</span></div>
+            </div>
+
+            <div class="distance">
+              <span data-icon="route" aria-hidden="true"></span>
+              <div><span class="distance-label">累计里程</span><span class="distance-value"><span id="distance-value">0.00</span> <small>km</small></span></div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <footer class="footer"><span><span class="footer-dot"></span> PELICAN VELO CLUB</span><span>沿着海岸，随风骑行。</span></footer>
+    </main>
+    <script type="module" src="/src/main.js"></script>
+  </body>
+</html>
