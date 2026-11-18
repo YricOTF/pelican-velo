@@ -1,5 +1,7 @@
 # 鹈鹕骑行 · 海风环线
 
+[在线试玩](https://yricotf.github.io/pelican-velo/)
+
 操控戴护目镜的鹈鹕骑上复古单车，沿海岛公路绕一圈。路线全长约 246 米，经过海崖灯塔和海边小屋。右上角的小地图显示车头方向与当前位置。
 
 <img src="public/pelican-poster.webp" alt="鹈鹕骑行游戏画面" width="850">
@@ -26,3 +28,5 @@ npm run dev
 ```
 
 运行 `npm run build` 生成静态站点 `dist/`。用 `npm run preview` 预览构建，或将 `dist/` 部署到静态网站。构建使用相对资源路径，支持 GitHub Pages 项目子路径。
+
+GitHub Pages 从 `main` 分支根目录发布。修改游戏后，运行 `npm run prepare:pages`，然后将游戏源码和生成的站点文件一起提交。开发用的 HTML 入口位于 `game/index.html`。

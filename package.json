@@ -5,8 +5,9 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "vite build --base=./",
-    "preview": "vite preview"
+    "build": "vite build",
+    "preview": "vite preview",
+    "prepare:pages": "npm run build && node scripts/prepare-pages.mjs"
   },
   "dependencies": {
     "@fontsource-variable/space-grotesk": "^5.2.10",
