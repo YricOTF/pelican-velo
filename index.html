@@ -1,0 +1,110 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="theme-color" content="#131a18">
+    <meta name="description" content="操控鹈鹕骑上单车，沿着海风环线绕岛一圈。支持手机触控与电脑键盘。">
+    <link rel="icon" type="image/png" href="./favicon.png">
+    <title>鹈鹕骑行 · 海风环线</title>
+    <script type="module" crossorigin src="./assets/index-B9ok5F6q.js"></script>
+    <link rel="stylesheet" crossorigin href="./assets/index-nYo_C9Ti.css">
+  </head>
+  <body>
+    <main class="shell">
+      <header class="header">
+        <div class="wordmark">
+          <span class="brand-icon" data-icon="bird" aria-hidden="true"></span>
+          <span>PELICAN<span class="wordmark-accent">VELO</span></span>
+        </div>
+        <button class="weather" id="weather" type="button" aria-label="切换为日落">
+          <span class="weather-day" data-icon="sun" aria-hidden="true"></span>
+          <span class="weather-sunset" data-icon="sunset" aria-hidden="true"></span>
+          <span id="weather-label">晴天</span>
+        </button>
+      </header>
+
+      <section class="ride" aria-labelledby="ride-title">
+        <div class="intro">
+          <div>
+            <p class="edition"><span></span> PELICAN LOOP</p>
+            <h1 id="ride-title">海风环线<span>.</span></h1>
+          </div>
+          <div class="route-meta">
+            <span data-icon="route" aria-hidden="true"></span>
+            <span>环岛公路</span>
+            <span class="route-length" id="route-length"></span>
+          </div>
+        </div>
+
+        <div class="ride-panel">
+          <div id="stage" class="stage" data-mode="loading">
+            <div id="viewport" class="viewport" tabindex="-1" role="img" aria-label="鹈鹕骑着复古单车沿海岛公路行驶">
+              <img class="fallback-image" src="./pelican-poster.webp" width="1254" height="523" alt="">
+            </div>
+
+            <div class="instrument" aria-label="骑行数据">
+              <div class="gauge">
+                <span id="speed">0</span><span class="unit">km/h</span>
+              </div>
+              <div class="instrument-row">
+                <span><span data-icon="flag" aria-hidden="true"></span><span id="laps">0 圈</span></span>
+                <span><span data-icon="clock-3" aria-hidden="true"></span><span id="lap-time">0:00</span></span>
+              </div>
+            </div>
+
+            <div class="map" aria-label="环岛路线">
+              <canvas id="minimap" width="160" height="120" role="img" aria-label="环岛公路与当前骑行位置"></canvas>
+              <span id="lap-progress">0%</span>
+            </div>
+
+            <div class="status-stack" aria-live="polite">
+              <div class="toast" id="toast" hidden></div>
+              <div class="offroad" id="offroad" hidden>已离开公路 · 沙地减速</div>
+            </div>
+
+            <div class="brief" id="brief">
+              <div>
+                <h2 id="brief-title">准备出发</h2>
+                <p id="brief-copy"><span class="desktop-copy">用方向键或 WASD 控车，沿海岸骑完一圈。</span><span class="touch-copy">按住踏板加速，用方向键转弯。</span></p>
+              </div>
+              <button id="start" class="primary" type="button" disabled>
+                <span data-icon="play" aria-hidden="true"></span><span id="start-label">正在加载</span>
+              </button>
+            </div>
+
+            <div class="game-tools">
+              <button id="pause" type="button" class="tool-button" aria-label="暂停骑行" title="暂停骑行（空格）" data-icon="pause" disabled></button>
+              <button id="recover" type="button" class="tool-button" aria-label="返回公路" title="返回公路（R）" data-icon="rotate-ccw" disabled></button>
+            </div>
+          </div>
+
+          <div class="control-dock" aria-label="驾驶按键">
+            <div class="control-group steering">
+              <button type="button" class="drive" data-drive="left" aria-label="左转（左方向键或 A）" disabled>
+                <span data-icon="chevron-left" aria-hidden="true"></span><span>左转</span>
+              </button>
+              <button type="button" class="drive" data-drive="right" aria-label="右转（右方向键或 D）" disabled>
+                <span data-icon="chevron-right" aria-hidden="true"></span><span>右转</span>
+              </button>
+            </div>
+            <div class="dock-middle">
+              <span class="keyboard-hint"><span data-icon="keyboard" aria-hidden="true"></span> WASD / 方向键</span>
+              <span class="best">最佳单圈 <strong id="best-time">—</strong></span>
+            </div>
+            <div class="control-group pedals">
+              <button type="button" class="drive brake" data-drive="brake" aria-label="刹车（下方向键或 S）" disabled>
+                <span data-icon="octagon" aria-hidden="true"></span><span>刹车</span>
+              </button>
+              <button type="button" class="drive throttle" data-drive="throttle" aria-label="踩踏加速（上方向键或 W）" disabled>
+                <span data-icon="arrow-up" aria-hidden="true"></span><span>踩踏</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <footer class="footer"><span><span class="footer-dot"></span> PELICAN VELO CLUB</span><span class="footer-tip">回到公路 <kbd>R</kbd> <span></span> 暂停 <kbd>Space</kbd></span></footer>
+    </main>
+  </body>
+</html>
