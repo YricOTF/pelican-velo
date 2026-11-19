@@ -2,7 +2,7 @@ import { cp, readFile, rm, writeFile } from 'node:fs/promises';
 
 const project = new URL('../', import.meta.url);
 const dist = new URL('dist/', project);
-const generatedFiles = ['favicon.png', 'pelican-poster.webp'];
+const generatedFiles = ['favicon.png', 'pelican-poster.webp', 'map-harbor.webp', 'map-basalt.webp'];
 const assets = new URL('pages-assets/', project);
 
 const html = await readFile(new URL('index.html', dist), 'utf8');

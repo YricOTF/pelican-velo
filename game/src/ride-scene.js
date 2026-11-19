@@ -5,6 +5,7 @@ import { createPelican } from './pelican.js';
 import { createIsland } from './island.js';
 import { createRidePhysics } from './ride-physics.js';
 import { createTraffic } from './traffic.js';
+import { createWeatherEffects, getConditionsVisuals } from './weather.js';
 
 const step = 1 / 120;
 const tau = Math.PI * 2;
@@ -34,9 +35,13 @@ function createContactShadow() {
   return shadow;
 }
 
-export function createRideScene(viewport, { getInput, onState, onContextStatus }) {
+export function createRideScene(viewport, {
+  getInput, onState, onContextStatus, onSnapshot,
+  mapId = 'coast', weather = 'clear', timeOfDay = 'day', slot = 0,
+}) {
   const scene = new THREE.Scene();
-  scene.fog = new THREE.FogExp2(0xade4cf, .009);
+  const conditions = getConditionsVisuals(weather, timeOfDay);
+  scene.fog = new THREE.FogExp2(conditions.fogColor, conditions.fogDensity);
   const camera = new THREE.PerspectiveCamera(48, 1, 0.2, 420);
   const appleTouch = /iPhone|iPad|iPod/.test(navigator.userAgent)
     || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
@@ -51,14 +56,16 @@ export function createRideScene(viewport, { getInput, onState, onContextStatus }
   renderer.toneMappingExposure = 1.17;
   viewport.append(renderer.domElement);
 
-  const ambient = new THREE.HemisphereLight(0xfff4df, 0x8abfaf, 1.82);
-  const key = new THREE.DirectionalLight(0xffe1b5, 2.65);
-  key.position.set(-4, 6, 3);
-  const rim = new THREE.DirectionalLight(0xaddfdb, 1.18);
-  rim.position.set(2.2, 3.0, -3);
-  scene.add(ambient, key, rim);
+  const ambient = new THREE.HemisphereLight(conditions.ambientColor, conditions.groundColor, conditions.ambientIntensity);
+  const key = new THREE.DirectionalLight(conditions.keyColor, conditions.keyIntensity);
+  key.position.set(...conditions.keyPosition);
+  const rim = new THREE.DirectionalLight(conditions.rimColor, conditions.rimIntensity);
+  rim.position.set(2.2, 3, -3);
+  const weatherEffects = createWeatherEffects();
+  scene.add(ambient, key, rim, weatherEffects.group);
 
-  const island = createIsland();
+  const waterCondition = timeOfDay === 'night' ? 'night' : timeOfDay === 'dusk' ? 'sunset' : weather;
+  const island = createIsland(mapId);
   const traffic = createTraffic(island.curve, island.roadWidth);
   const physics = createRidePhysics(island.curve, island.roadWidth, traffic);
   const trafficModels = traffic.cars.map((car) => {
@@ -81,9 +88,16 @@ export function createRideScene(viewport, { getInput, onState, onContextStatus }
   const cameraGoal = new THREE.Vector3();
   const cameraTarget = new THREE.Vector3();
   const targetGoal = new THREE.Vector3();
+  if (slot > 0) {
+    const offset = [0, -1.05, 1.05, 2.1][Math.min(slot, 3)];
+    const { position, heading } = physics.state;
+    position.x -= Math.sin(heading) * offset;
+    position.z += Math.cos(heading) * offset;
+  }
   const viewOrigin = physics.state.position.clone();
+  const remoteRiders = new Map();
+  const retiredRiders = new Map();
   let mode = 'ready';
-  let weather = 'day';
   let frame = 0;
   let steppedTime = 0;
   let previousFrame = 0;
@@ -150,6 +164,74 @@ export function createRideScene(viewport, { getInput, onState, onContextStatus }
     camera.lookAt(cameraTarget);
   }
 
+  function setPlayers(players, selfId) {
+    const others = new Set(players.filter(({ id }) => id !== selfId).map(({ id }) => id));
+    for (const [id, remote] of remoteRiders) {
+      if (others.has(id)) continue;
+      remote.group.visible = false;
+      remoteRiders.delete(id);
+      retiredRiders.set(id, remote);
+    }
+    for (const player of players) {
+      if (player.id === selfId || remoteRiders.has(player.id)) continue;
+      const previous = retiredRiders.get(player.id);
+      if (previous) {
+        retiredRiders.delete(player.id);
+        remoteRiders.set(player.id, previous);
+        continue;
+      }
+      const bike = createBicycle();
+      const bird = createPelican();
+      const group = new THREE.Group();
+      const body = new THREE.Group();
+      body.add(bike.group, bird.group);
+      group.add(body);
+      const marker = new THREE.Mesh(
+        new THREE.OctahedronGeometry(.14),
+        new THREE.MeshBasicMaterial({ color: [0xe6fc90, 0x8ad7ff, 0xf3a2ac, 0xffcd7c][player.slot] ?? 0xe6fc90 }),
+      );
+      marker.position.y = 3.15;
+      group.add(marker);
+      group.visible = false;
+      scene.add(group);
+      remoteRiders.set(player.id, { group, body, bird, bike, snapshot: null, heading: 0, received: 0 });
+    }
+    requestFrame();
+  }
+
+  function receiveSnapshot(id, snapshot) {
+    const remote = remoteRiders.get(id);
+    if (!remote) return;
+    if (!remote.snapshot || remote.group.position.distanceToSquared(new THREE.Vector3(snapshot.x, snapshot.y, snapshot.z)) > 18 ** 2) {
+      remote.group.position.set(snapshot.x, snapshot.y, snapshot.z);
+      remote.heading = snapshot.heading;
+    }
+    remote.snapshot = snapshot;
+    remote.received = performance.now();
+    requestFrame();
+  }
+
+  const remoteTarget = new THREE.Vector3();
+  function renderRemoteRiders(now, delta) {
+    const blend = 1 - Math.exp(-11 * Math.max(delta, .001));
+    for (const remote of remoteRiders.values()) {
+      const snapshot = remote.snapshot;
+      const age = (now - remote.received) * .001;
+      remote.group.visible = Boolean(snapshot && age < 4
+        && remote.group.position.distanceToSquared(camera.position) < trafficDrawDistance ** 2);
+      if (!remote.group.visible) continue;
+      const prediction = Math.min(.09, Math.max(0, age)) * snapshot.speed;
+      remoteTarget.set(snapshot.x + Math.cos(snapshot.heading) * prediction, snapshot.y, snapshot.z + Math.sin(snapshot.heading) * prediction);
+      remote.group.position.lerp(remoteTarget, blend);
+      const angle = snapshot.heading - remote.heading;
+      remote.heading += Math.atan2(Math.sin(angle), Math.cos(angle)) * blend;
+      remote.group.rotation.y = -remote.heading;
+      remote.body.rotation.x = .20 * snapshot.steer * Math.min(1, snapshot.speed / 8);
+      remote.bike.update(snapshot.wheelAngle, snapshot.crankAngle);
+      remote.bird.update(steppedTime, snapshot.crankAngle, snapshot.speed / 12);
+    }
+  }
+
   function render(now) {
     frame = 0;
     const delta = previousFrame ? Math.min((now - previousFrame) * .001, .1) : 0;
@@ -175,6 +257,12 @@ export function createRideScene(viewport, { getInput, onState, onContextStatus }
 
     if (now >= nextReport) {
       onState(state, traffic.cars);
+      if (mode === 'playing' && onSnapshot) {
+        const { x, y, z } = state.position;
+        onSnapshot({ x, y, z, heading: state.heading, speed: state.speed, steer: state.steer,
+          elapsed: state.elapsed, laps: state.laps, progress: state.progress, bestLap: state.bestLap,
+          distance: state.distance, wheelAngle, crankAngle, offroad: state.offroad, yielding: state.yielding });
+      }
       nextReport = now + 85;
     }
     rider.position.copy(state.position);
@@ -184,8 +272,10 @@ export function createRideScene(viewport, { getInput, onState, onContextStatus }
     wheels.rotation.y = -state.heading;
     bicycle.update(wheelAngle, crankAngle);
     pelican.update(steppedTime, crankAngle, state.speed / 12);
-    island.update(steppedTime, weather);
+    island.update(steppedTime, waterCondition);
     updateCamera(delta);
+    weatherEffects.update(mode === 'playing' ? delta : 0, camera, weather, timeOfDay, reduceMotion || appleTouch);
+    renderRemoteRiders(now, delta);
     for (let index = 0; index < traffic.cars.length; index += 1) {
       const car = traffic.cars[index];
       const model = trafficModels[index];
@@ -274,17 +364,8 @@ export function createRideScene(viewport, { getInput, onState, onContextStatus }
       nextReport = 0;
       requestFrame();
     },
-    setWeather(nextWeather) {
-      weather = nextWeather;
-      const sunset = weather === 'sunset';
-      scene.fog.color.set(sunset ? 0xf1b1a5 : 0xade4cf);
-      ambient.color.set(sunset ? 0xffcdaf : 0xfff4df);
-      ambient.groundColor.set(sunset ? 0xab899f : 0x8abfaf);
-      key.color.set(sunset ? 0xffa87b : 0xffe1b5);
-      key.intensity = sunset ? 2.3 : 2.65;
-      rim.color.set(sunset ? 0xf3a2b3 : 0xaddfdb);
-      requestFrame();
-    },
+    setPlayers,
+    receiveSnapshot,
     dispose() {
       stopFrame();
       sizeObserver.disconnect();
@@ -312,6 +393,7 @@ export function createRideScene(viewport, { getInput, onState, onContextStatus }
       for (const material of materials) material.dispose();
       for (const texture of textures) texture.dispose();
       renderer.dispose();
+      renderer.forceContextLoss();
     },
   };
 }

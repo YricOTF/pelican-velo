@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 
+import { defaultMapId, getMap } from './maps.js';
 import { createWater } from './water.js';
 
 const roadWidth = 8.5;
@@ -9,12 +10,56 @@ const seaLevel = -2.15;
 const slices = 720;
 const tau = Math.PI * 2;
 
-function track() {
-  const winding = Array.from({ length: 36 }, (_, i) => {
-    const angle = Math.PI * 0.62 - (i / 36) * tau;
-    const radius = 1 + 0.14 * Math.cos(3 * angle - 0.8)
-      + 0.08 * Math.sin(5 * angle + 0.45) + 0.02 * Math.cos(7 * angle + 0.75);
-    return new THREE.Vector3(126 * Math.cos(angle) * radius, 0, 104 * Math.sin(angle) * radius);
+function cove(angle, center, spread) {
+  const delta = Math.atan2(Math.sin(angle - center), Math.cos(angle - center));
+  return Math.exp(-((delta / spread) ** 2));
+}
+
+const routes = {
+  coast: {
+    start: Math.PI * 0.62, width: 126, depth: 104, points: 36,
+    radius: (a) => 1 + 0.14 * Math.cos(3 * a - 0.8)
+      + 0.08 * Math.sin(5 * a + 0.45) + 0.02 * Math.cos(7 * a + 0.75),
+    asphalt: '#8e8e82', paint: '#fff1ca', sand: '#efd4a0', hills: 1, seed: 844,
+    outer: ['#dbc78f', '#e3d09a', '#d9c487', '#e1c38c', '#d8a975', '#d4a178', '#bc815f', '#d2ab7f', '#dfc28d', '#e3cb99'],
+    inner: ['#a6af79', '#a8b37d', '#a8b981', '#bcc487', '#b8c286', '#b4be84', '#c7ca89', '#c9ce91', '#ced098', '#d8ce98', '#dfcb92', '#e6cd96', '#dbc78f'],
+    rocks: ['#d7af81', '#e1be93', '#c3906a', '#ead0a3', '#ceab85'],
+    plants: ['#899c64', '#8c9b53', '#a3a965', '#7a9259'],
+    flowers: ['#e78c95', '#ffe0a6', '#f6af61', '#db9cbd'],
+    palms: ['#5b8d66', '#728f55', '#849b60', '#9ba867'],
+    stackColors: ['#bd936f', '#d3b58c'],
+  },
+  harbor: {
+    start: 2.35, width: 111, depth: 84, points: 40,
+    radius: (a) => 1 + 0.08 * Math.cos(3 * a + 0.8) + 0.04 * Math.sin(5 * a + 0.9) - 0.27 * cove(a, 1.52, 0.62),
+    asphalt: '#9e877a', paint: '#fff0d4', sand: '#efbdac', hills: 0.87, seed: 539,
+    outer: ['#dbad8e', '#e8b9a3', '#e2ac91', '#dfab94', '#dba288', '#d28c73', '#ac735e', '#cc9585', '#e9b5a5', '#edc1ad'],
+    inner: ['#879b76', '#9da677', '#a6a97a', '#adad7c', '#b3b181', '#bbb081', '#ccbb90', '#cfb38b', '#d8b68e', '#deaf8e', '#e5b59a', '#e6b39a', '#dbad8e'],
+    rocks: ['#d7967d', '#dcaa92', '#b47764', '#eac6ad', '#d09981'],
+    plants: ['#79976d', '#90a16f', '#a9a978', '#698a70'],
+    flowers: ['#d9829e', '#ffcba2', '#ebaf96', '#b891c4'],
+    palms: ['#558c74', '#65946c', '#75a070', '#8ca978'],
+    stackColors: ['#b98270', '#d3a38d'],
+  },
+  basalt: {
+    start: 1.95, width: 152, depth: 107, points: 40,
+    radius: (a) => 1 + 0.088 * Math.sin(4 * a - 0.24) - 0.049 * Math.cos(3 * a + 0.62) + 0.016 * Math.sin(6 * a - 0.7),
+    asphalt: '#5c5861', paint: '#f3d6a1', sand: '#636078', hills: 1.63, seed: 1697,
+    outer: ['#625764', '#645865', '#5c5462', '#595360', '#4c4656', '#413e4e', '#373545', '#595366', '#4b475c', '#5c5770'],
+    inner: ['#524f67', '#58566c', '#625973', '#665c74', '#65596b', '#6b5f6a', '#786777', '#7c6b78', '#806b70', '#77626e', '#705c68', '#665766', '#625764'],
+    rocks: ['#5c5369', '#776274', '#846679', '#645c72', '#514d5e'],
+    plants: ['#9d895d', '#a58e60', '#b39c69', '#847954'],
+    flowers: ['#cc826c', '#dcaa72', '#c57661', '#ac8e8c'],
+    palms: ['#686d54', '#7b7d58', '#918452', '#a09061'],
+    stackColors: ['#464453', '#6d5f77'],
+  },
+};
+
+function track(route) {
+  const winding = Array.from({ length: route.points }, (_, i) => {
+    const angle = route.start - i / route.points * tau;
+    const radius = route.radius(angle);
+    return new THREE.Vector3(route.width * Math.cos(angle) * radius, 0, route.depth * Math.sin(angle) * radius);
   });
   const curve = new THREE.CatmullRomCurve3(winding, true, 'centripetal');
   curve.arcLengthDivisions = 3200;
@@ -88,16 +133,13 @@ function stripGeometry(sample, rows, columns) {
   return geometry;
 }
 
-function terrain(group, frames) {
+function terrain(group, frames, route) {
   const dryMaterial = new THREE.MeshStandardMaterial({
     vertexColors: true, roughness: 0.94, side: THREE.DoubleSide,
   });
-  const outside = [
-    [0, '#dbc78f'], [0.06, '#e3d09a'], [0.20, '#d9c487'], [0.38, '#e1c38c'],
-    [0.52, '#d8a975'], [0.65, '#d4a178'], [0.76, '#bc815f'], [0.90, '#d2ab7f'],
-    [1, '#dfc28d'], [1.20, '#e3cb99'],
-  ].map(([fraction, color]) => ({ fraction, color: new THREE.Color(color) }));
-  const sand = new THREE.Color('#efd4a0');
+  const outside = [0, 0.06, 0.20, 0.38, 0.52, 0.65, 0.76, 0.90, 1, 1.20]
+    .map((fraction, i) => ({ fraction, color: new THREE.Color(route.outer[i]) }));
+  const sand = new THREE.Color(route.sand);
   const outsideStrip = new THREE.Mesh(stripGeometry((row, column) => {
     const frame = frames[row];
     const edge = shorelineOffset(frame.progress);
@@ -109,16 +151,12 @@ function terrain(group, frames) {
   outsideStrip.receiveShadow = true;
   group.add(outsideStrip);
 
-  const inner = [
-    [1, '#a6af79'], [0.9, '#a8b37d'], [0.8, '#a8b981'], [0.69, '#bcc487'],
-    [0.59, '#b8c286'], [0.48, '#b4be84'], [0.36, '#c7ca89'], [0.26, '#c9ce91'],
-    [0.18, '#ced098'], [0.12, '#d8ce98'], [0.07, '#dfcb92'], [0.035, '#e6cd96'],
-    [0, '#dbc78f'],
-  ].map(([amount, color]) => ({ amount, color: new THREE.Color(color) }));
+  const inner = [1, 0.9, 0.8, 0.69, 0.59, 0.48, 0.36, 0.26, 0.18, 0.12, 0.07, 0.035, 0]
+    .map((amount, i) => ({ amount, color: new THREE.Color(route.inner[i]) }));
   const fill = new THREE.Mesh(stripGeometry((row, column) => {
     const frame = frames[row];
     const point = positionAt(frame, -roadEdge).multiplyScalar(1 - column.amount);
-    const height = innerElevation(point.x, point.z);
+    const height = innerElevation(point.x, point.z) * route.hills;
     const hill = THREE.MathUtils.smoothstep(column.amount, 0.027, 0.64);
     point.y = roadLevel + hill * height;
     const patches = 1 + Math.sin(point.x * 0.13 + point.z * 0.24) * 0.045
@@ -129,8 +167,8 @@ function terrain(group, frames) {
   group.add(fill);
 }
 
-function road(group, curve, frames) {
-  const baseColor = new THREE.Color('#8e8e82');
+function road(group, curve, frames, route) {
+  const baseColor = new THREE.Color(route.asphalt);
   const geometry = stripGeometry((row, offset) => {
     const frame = frames[row];
     const point = frame.point.clone().addScaledVector(frame.outer, offset);
@@ -185,7 +223,7 @@ function road(group, curve, frames) {
   markingGeometry.setIndex(indices);
   markingGeometry.computeVertexNormals();
   const markings = new THREE.Mesh(markingGeometry, new THREE.MeshStandardMaterial({
-    color: '#fff1ca', roughness: 0.95,
+    color: route.paint, roughness: 0.95,
   }));
   markings.receiveShadow = true;
   group.add(markings);
@@ -198,8 +236,8 @@ function seededRandom(seed) {
   };
 }
 
-function scatter(group, curve) {
-  const random = seededRandom(844);
+function scatter(group, curve, route) {
+  const random = seededRandom(route.seed);
   const transform = new THREE.Object3D();
   const tint = new THREE.Color();
   function instances(geometry, count, options = {}) {
@@ -231,9 +269,7 @@ function scatter(group, curve) {
   plantGeometry.computeVertexNormals();
   const plants = instances(plantGeometry, 1536, { side: THREE.DoubleSide });
   const flowers = instances(new THREE.IcosahedronGeometry(1, 0), 420);
-  const rocksPalette = ['#d7af81', '#e1be93', '#c3906a', '#ead0a3', '#ceab85'];
-  const plantsPalette = ['#899c64', '#8c9b53', '#a3a965', '#7a9259'];
-  const flowersPalette = ['#e78c95', '#ffe0a6', '#f6af61', '#db9cbd'];
+  const { rocks: rocksPalette, plants: plantsPalette, flowers: flowersPalette, palms: frondColors } = route;
 
   for (let i = 0; i < rocks.count; i += 1) {
     const frame = frameAt(curve, random());
@@ -282,7 +318,6 @@ function scatter(group, curve) {
   ]);
   frondGeometry.computeVertexNormals();
   const fronds = instances(frondGeometry, trunks.count * 8, { side: THREE.DoubleSide });
-  const frondColors = ['#5b8d66', '#728f55', '#849b60', '#9ba867'];
 
   for (let i = 0; i < trunks.count; i += 1) {
     const frame = frameAt(curve, i < 3 ? 0.002 + i * 0.007 : (i + random() * 0.4) / trunks.count);
@@ -334,15 +369,17 @@ function landmark(group, curve, u, offset) {
   return assembly;
 }
 
-function entryGate(group, curve) {
+function entryGate(group, curve, map) {
   const gate = landmark(group, curve, 11 / curve.getLength(), 0);
+  const frameColor = map.id === 'harbor' ? '#b87b66' : map.id === 'basalt' ? '#796b80' : '#53877c';
+  const headerColor = map.id === 'coast' ? '#4f7e73' : frameColor;
   for (const x of [-4.79, 4.79]) {
     box(gate, '#dcb88a', x, 0.28, 0, 0.66, 0.56, 0.66);
-    box(gate, '#53877c', x, 2.28, 0, 0.31, 4.1, 0.39);
+    box(gate, frameColor, x, 2.28, 0, 0.31, 4.1, 0.39);
     box(gate, '#df9e79', x, 1.04, 0, 0.324, 0.27, 0.404);
     box(gate, '#75a696', x * 0.88, 3.85, 0, 0.16, 0.96, 0.22).rotation.z = Math.sign(x) * -0.91;
   }
-  const header = box(gate, '#4f7e73', 0, 4.39, 0, 9.94, 0.42, 0.37);
+  const header = box(gate, headerColor, 0, 4.39, 0, 9.94, 0.42, 0.37);
   header.castShadow = true;
   const plaque = box(gate, '#f9dfac', 0, 4.43, 0.18, 5.35, 0.82, 0.12);
   plaque.castShadow = true;
@@ -356,7 +393,7 @@ function entryGate(group, curve) {
     context.font = 'bold 49px sans-serif';
     context.textAlign = 'center';
     context.textBaseline = 'middle';
-    context.fillText('PELICAN LOOP', 256, 43);
+    context.fillText(map.label, 256, 43, 474);
     const texture = new THREE.CanvasTexture(canvas);
     texture.colorSpace = THREE.SRGBColorSpace;
     const banner = new THREE.Mesh(
@@ -368,8 +405,9 @@ function entryGate(group, curve) {
   }
 }
 
-function lighthouse(group, curve) {
-  const tower = landmark(group, curve, 0.245, 8.6);
+function lighthouse(group, curve, mapId) {
+  const position = mapId === 'harbor' ? 0.13 : mapId === 'basalt' ? 0.397 : 0.245;
+  const tower = landmark(group, curve, position, 8.6);
   tower.scale.setScalar(1.26);
   const foundation = '#b58661';
   object(tower, new THREE.CylinderGeometry(1.8, 2.2, 0.5, 12), foundation, 0, 0.08, 0);
@@ -426,8 +464,8 @@ function windmill(group, curve) {
   return rotor;
 }
 
-function harborPier(group, curve) {
-  const dock = landmark(group, curve, 0.635, 12.8);
+function harborPier(group, curve, progress = 0.635) {
+  const dock = landmark(group, curve, progress, 12.8);
   dock.position.y = 0.18;
   const transform = new THREE.Object3D();
   const planks = new THREE.InstancedMesh(
@@ -459,7 +497,7 @@ function harborPier(group, curve) {
   box(dock, '#ecba7c', 8.14, 0.68, -0.63, 0.90, 0.07, 0.54);
 }
 
-function seaStacks(group, curve) {
+function seaStacks(group, curve, route) {
   const clusters = [
     [0.088, 28, 3.7, 5.7], [0.092, 33, 2.3, 3.6], [0.102, 30, 1.9, 2.1],
     [0.303, 33, 2.8, 4.7], [0.312, 35, 2, 2.1],
@@ -480,13 +518,13 @@ function seaStacks(group, curve) {
     transform.rotation.set(0.18, i * 0.93, 0.07);
     transform.updateMatrix();
     mesh.setMatrixAt(2 * i, transform.matrix);
-    mesh.setColorAt(2 * i, color.set('#bd936f'));
+    mesh.setColorAt(2 * i, color.set(route.stackColors[0]));
     transform.position.y += height * 0.39;
     transform.scale.set(radius * 0.73, height * 0.28, radius * 0.62);
     transform.rotation.y += 1.67;
     transform.updateMatrix();
     mesh.setMatrixAt(2 * i + 1, transform.matrix);
-    mesh.setColorAt(2 * i + 1, color.set('#d3b58c'));
+    mesh.setColorAt(2 * i + 1, color.set(route.stackColors[1]));
   }
   group.add(mesh);
 }
@@ -521,39 +559,114 @@ function sailboats(group, curve) {
   return boats;
 }
 
-export function createIsland() {
+function harborVillage(group, curve) {
+  const colors = ['#d68a76', '#f0c5a3', '#e0a481', '#b9919f', '#e7b996', '#d7836f', '#e7b28e'];
+  const roofs = ['#a86459', '#b67562', '#b96e61', '#937180', '#b46d5b', '#a05c52', '#a76659'];
+  const shutters = ['#587f74', '#667f6c', '#597d76', '#62677d'];
+  const strides = [0.98, 0.991, 0.001, 0.031, 0.0375, 0.0439, 0.052];
+  for (let i = 0; i < strides.length; i += 1) {
+    const home = landmark(group, curve, strides[i], 7.3 + (i % 3) * 0.57);
+    const height = 2.05 + (i % 3) * 0.57;
+    box(home, '#c29887', 0, 0.09, 0, 3.05, 0.41, 3.36);
+    box(home, colors[i], 0, height * 0.5, 0, 2.83, height, 3.13);
+    const tiles = object(home, new THREE.CylinderGeometry(0.43, 1, 1, 4), roofs[i], 0, height + 0.23, 0);
+    tiles.rotation.y = Math.PI * 0.25;
+    tiles.scale.set(2.19, 0.69, 2.42);
+    box(home, shutters[i % shutters.length], -1.43, 0.70, 0.57, 0.12, 1.37, 0.68);
+    box(home, '#f3d8b1', -1.451, height * 0.67, -0.51, 0.14, 0.59, 0.85);
+    box(home, shutters[(i + 2) % shutters.length], -1.53, height * 0.67, -0.51, 0.065, 0.44, 0.66);
+  }
+}
+
+function basaltCliffs(group, curve) {
+  const sites = [
+    [0.006, 10.1], [0.025, 9.1], [0.16, 10.4], [0.265, 8.8],
+    [0.398, 10.8], [0.56, 8.7], [0.73, 10.8], [0.88, 10.3], [0.973, 9.2],
+  ];
+  const random = seededRandom(5581);
+  const transform = new THREE.Object3D();
+  const palette = ['#565364', '#625668', '#474653', '#73687a', '#645560', '#867087'];
+  const columns = new THREE.InstancedMesh(
+    new THREE.CylinderGeometry(0.83, 1, 1, 6),
+    new THREE.MeshStandardMaterial({ roughness: 0.96, flatShading: true }),
+    sites.length * 8,
+  );
+  columns.name = 'Basalt cliffs';
+  const tint = new THREE.Color();
+  for (let site = 0; site < sites.length; site += 1) {
+    const [u, offset] = sites[site];
+    for (let i = 0; i < 8; i += 1) {
+      const frame = frameAt(curve, u + (i - 3.5) / 650);
+      const point = positionAt(frame, offset + random() * 2.9);
+      const height = 1.2 + random() * 4.9;
+      const width = 0.61 + random() * 1.28;
+      transform.position.set(point.x, point.y + height * 0.39, point.z);
+      transform.rotation.set(0.03, random() * tau, -0.05);
+      transform.scale.set(width, height, width * 0.95);
+      transform.updateMatrix();
+      const index = site * 8 + i;
+      columns.setMatrixAt(index, transform.matrix);
+      columns.setColorAt(index, tint.set(palette[index % palette.length]));
+    }
+  }
+  group.add(columns);
+
+  const arch = landmark(group, curve, 0.155, 30.5);
+  arch.position.y = seaLevel - 0.34;
+  arch.rotation.y += 0.95;
+  const rock = new THREE.DodecahedronGeometry(1, 0);
+  for (let i = 0; i <= 10; i += 1) {
+    const angle = i / 10 * Math.PI;
+    const height = Math.sin(angle) * 6.9;
+    const archRock = object(arch, rock, palette[(i + 1) % palette.length], Math.cos(angle) * 4.4, height, 0);
+    archRock.scale.set(1.85, 1.77, 2.12);
+    archRock.rotation.set(0.26 + i * 0.21, i * 0.62, -0.4 + i * 0.16);
+  }
+}
+
+export function createIsland(mapId = defaultMapId) {
+  const map = getMap(mapId);
+  const route = routes[map.id];
   const group = new THREE.Group();
-  group.name = 'Pelican Loop island';
-  const curve = track();
+  group.name = map.label;
+  const curve = track(route);
   const frames = Array.from({ length: slices + 1 }, (_, i) => frameAt(curve, i / slices));
   const shore = frames.map((frame) => positionAt(frame, shorelineOffset(frame.progress)));
-  const water = createWater(shore, seaLevel);
+  const water = createWater(shore, seaLevel, map.id);
   group.add(water.mesh);
-  terrain(group, frames);
-  road(group, curve, frames);
-  scatter(group, curve);
-  entryGate(group, curve);
-  const beacon = lighthouse(group, curve);
-  beachHuts(group, curve);
-  const rotor = windmill(group, curve);
-  harborPier(group, curve);
-  seaStacks(group, curve);
+  terrain(group, frames, route);
+  road(group, curve, frames, route);
+  scatter(group, curve, route);
+  entryGate(group, curve, map);
+  const beacon = lighthouse(group, curve, map.id);
+  const rotor = map.id === 'basalt' ? null : windmill(group, curve);
+  if (map.id === 'harbor') {
+    harborVillage(group, curve);
+    harborPier(group, curve, 0.025);
+    harborPier(group, curve, 0.29);
+  } else if (map.id === 'basalt') {
+    basaltCliffs(group, curve);
+  } else {
+    beachHuts(group, curve);
+    harborPier(group, curve);
+  }
+  seaStacks(group, curve, route);
   const boats = sailboats(group, curve);
   let previousWeather;
 
   function update(time, weather) {
     water.update(time, weather);
-    rotor.rotation.z = time * 0.36 + 0.42;
+    if (rotor) rotor.rotation.z = time * 0.36 + 0.42;
     for (let i = 0; i < boats.length; i += 1) {
       boats[i].position.y = seaLevel + Math.sin(time * 1.6 + i * 2) * 0.07 + 0.05;
       boats[i].rotation.z = Math.sin(time * 1.3 + i * 1.1) * 0.038;
     }
     if (weather !== previousWeather) {
-      beacon.material.emissiveIntensity = weather === 'sunset' ? 0.98 : 0.19;
+      beacon.material.emissiveIntensity = weather === 'night' ? 1.8 : weather === 'sunset' ? 0.98 : 0.19;
       previousWeather = weather;
     }
   }
 
   update(0, 'day');
-  return { group, curve, roadWidth, update };
+  return { group, curve, roadWidth, update, map };
 }

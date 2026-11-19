@@ -4,33 +4,127 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
     <meta name="theme-color" content="#131a18">
-    <meta name="description" content="操控鹈鹕骑上单车，沿海岛公路避让车辆，骑完海风环线。支持手机触控与电脑键盘。">
+    <meta name="description" content="选一条海岸路线，操控鹈鹕单人骑行或与好友联机。支持手机触控与电脑键盘。">
     <link rel="icon" type="image/png" href="/favicon.png">
-    <title>鹈鹕骑行 · 海风环线</title>
+    <title>鹈鹕骑行 · Pelican Velo</title>
   </head>
   <body>
-    <main class="shell">
+    <main class="shell" data-screen="home">
       <header class="header">
         <div class="wordmark">
           <span class="brand-icon" data-icon="bird" aria-hidden="true"></span>
           <span>PELICAN<span class="wordmark-accent">VELO</span></span>
         </div>
-        <button class="weather" id="weather" type="button" aria-label="切换为日落">
-          <span class="weather-day" data-icon="sun" aria-hidden="true"></span>
-          <span class="weather-sunset" data-icon="sunset" aria-hidden="true"></span>
-          <span id="weather-label">晴天</span>
-        </button>
+        <div class="header-context">
+          <span class="version-label" id="home-label">COASTAL CYCLING GAME</span>
+          <div class="weather" id="conditions" hidden aria-label="本局骑行条件">
+            <span data-icon="sun" id="conditions-icon" aria-hidden="true"></span>
+            <span id="conditions-label"></span>
+          </div>
+        </div>
       </header>
 
-      <section class="ride" aria-labelledby="ride-title">
+      <section class="home" id="home" aria-labelledby="home-title">
+        <div class="home-hero">
+          <img class="hero-image" src="/pelican-poster.webp" width="1254" height="523" alt="" fetchpriority="high">
+          <div class="hero-content">
+            <p class="edition"><span></span> PELICAN VELO CLUB</p>
+            <h1 id="home-title">鹈鹕骑行<span>.</span></h1>
+            <p class="hero-description">选一条海岸公路，迎着风开启一圈。</p>
+            <div class="hero-actions">
+              <button type="button" class="primary" id="solo" disabled><span data-icon="play" aria-hidden="true"></span> 单人骑行</button>
+              <button type="button" class="secondary" id="show-online" disabled><span data-icon="users" aria-hidden="true"></span> 好友联机</button>
+            </div>
+          </div>
+        </div>
+
+        <section class="routes-section" aria-labelledby="routes-title">
+          <div class="routes-heading">
+            <h2 id="routes-title">选择路线</h2>
+            <p><span data-icon="shuffle" aria-hidden="true"></span> 天气与时段每局抽取</p>
+          </div>
+          <div class="map-grid" id="map-grid" role="group" aria-label="选择路线">
+            <button class="map-card" type="button" data-map-id="coast" aria-pressed="true">
+              <img src="/pelican-poster.webp" alt="" width="1254" height="523">
+              <span class="map-card-name"><strong>海风环线</strong><span>沿海公路与灯塔</span></span>
+              <span class="map-check" data-icon="check" aria-hidden="true"></span>
+            </button>
+            <button class="map-card" type="button" data-map-id="harbor" aria-pressed="false">
+              <img src="/map-harbor.webp" alt="" width="640" height="310" loading="lazy">
+              <span class="map-card-name"><strong>月牙港</strong><span>海湾、码头与暖色小镇</span></span>
+              <span class="map-check" data-icon="check" aria-hidden="true"></span>
+            </button>
+            <button class="map-card" type="button" data-map-id="basalt" aria-pressed="false">
+              <img src="/map-basalt.webp" alt="" width="640" height="310" loading="lazy">
+              <span class="map-card-name"><strong>黑岩岬</strong><span>玄武岩海岸与曲折岬角</span></span>
+              <span class="map-check" data-icon="check" aria-hidden="true"></span>
+            </button>
+          </div>
+        </section>
+      </section>
+
+      <section class="online-panel" id="online" aria-labelledby="online-title" hidden>
+        <button type="button" class="text-button" id="back-online"><span data-icon="chevron-left" aria-hidden="true"></span> 返回主菜单</button>
+        <div class="online-heading">
+          <p class="edition"><span></span> GROUP RIDE</p>
+          <h1 id="online-title">好友联机<span>.</span></h1>
+        </div>
+
+        <form class="room-card" id="room-form">
+          <div class="field-row">
+            <label>骑手昵称<input id="rider-name" maxlength="18" placeholder="鹈鹕骑手" autocomplete="nickname"></label>
+            <label>连接方式<select id="connection">
+              <option value="direct">WebRTC 直连</option>
+              <option value="turn">WebRTC + TURN</option>
+              <option value="relay">WebSocket 中继</option>
+            </select></label>
+          </div>
+          <p class="connection-hint" id="connection-hint">使用公共信令服务。适合网络能直接互通时使用。</p>
+          <div id="turn-fields" class="connection-fields" hidden>
+            <label>TURN 地址<input id="turn-url" type="text" inputmode="url" placeholder="turns:example.net:443?transport=tcp" autocapitalize="off" spellcheck="false"></label>
+            <div class="field-row">
+              <label>用户名<input id="turn-user" autocomplete="off" spellcheck="false" autocapitalize="off"></label>
+              <label>凭据<input id="turn-secret" type="password" autocomplete="off"></label>
+            </div>
+            <a class="connection-link" href="https://www.metered.ca/tools/openrelay/" target="_blank" rel="noopener noreferrer">获取 Open Relay 免费 TURN 凭据</a>
+          </div>
+          <div id="relay-fields" class="connection-fields" hidden>
+            <label>中继服务器地址<input id="relay-url" type="url" placeholder="wss://relay.example.net" spellcheck="false" autocapitalize="off"></label>
+          </div>
+          <div class="room-actions">
+            <button type="button" class="primary" id="host"><span data-icon="users" aria-hidden="true"></span> 创建房间</button>
+            <div class="join-control">
+              <label class="visually-hidden" for="room-code">房间码</label>
+              <input id="room-code" placeholder="输入房间码" maxlength="12" autocapitalize="characters" autocomplete="off" spellcheck="false">
+              <button type="submit" class="secondary" id="join">加入房间</button>
+            </div>
+          </div>
+        </form>
+
+        <div class="room-card" id="room-lobby" hidden>
+          <div class="lobby-top">
+            <div><h2>骑行房间</h2><p id="lobby-transport"></p></div>
+            <button class="secondary" type="button" id="copy-code" title="复制房间码"><span data-icon="copy" aria-hidden="true"></span><strong id="lobby-code"></strong></button>
+          </div>
+          <label id="host-course" hidden>本局路线<select id="lobby-map"></select></label>
+          <ul id="lobby-players" class="lobby-players" aria-label="房间玩家"></ul>
+          <div class="lobby-actions">
+            <button class="primary" id="start-round" type="button" hidden><span data-icon="play" aria-hidden="true"></span> 开始联机骑行</button>
+            <button class="secondary" id="leave-room" type="button">退出房间</button>
+          </div>
+        </div>
+        <p class="room-status" id="room-status" role="status"></p>
+      </section>
+
+      <section class="ride" id="ride" aria-labelledby="ride-title" hidden>
         <div class="intro">
           <div>
-            <p class="edition"><span></span> PELICAN LOOP</p>
-            <h1 id="ride-title">海风环线<span>.</span></h1>
+            <p class="edition"><span></span> <span id="ride-edition">PELICAN LOOP</span></p>
+            <h1 id="ride-title"><span id="ride-name">海风环线</span><span>.</span></h1>
           </div>
           <div class="route-meta">
             <span data-icon="route" aria-hidden="true"></span>
-            <span>环岛公路</span>
+            <span id="route-context">环岛公路</span>
             <span class="route-length" id="route-length"></span>
           </div>
         </div>
@@ -49,6 +143,7 @@
                 <span><span data-icon="flag" aria-hidden="true"></span><span id="laps">0 圈</span></span>
                 <span><span data-icon="clock-3" aria-hidden="true"></span><span id="lap-time">0:00</span></span>
               </div>
+              <div id="conditions-inline" class="conditions-inline"></div>
             </div>
 
             <div class="map" aria-label="环岛路线">
@@ -74,6 +169,7 @@
 
             <div class="game-tools">
               <button id="pause" type="button" class="tool-button" aria-label="暂停骑行" title="暂停骑行（空格）" data-icon="pause" disabled></button>
+              <button id="back-game" type="button" class="tool-button" aria-label="返回主菜单" title="返回主菜单" data-icon="house"></button>
               <button id="recover" type="button" class="tool-button" aria-label="返回公路" title="返回公路（R）" data-icon="rotate-ccw" disabled></button>
             </div>
           </div>
@@ -103,7 +199,7 @@
         </div>
       </section>
 
-      <footer class="footer"><span><span class="footer-dot"></span> PELICAN VELO CLUB</span><span class="footer-tip">回到公路 <kbd>R</kbd> <span></span> 暂停 <kbd>Space</kbd></span></footer>
+      <footer class="footer"><span><span class="footer-dot"></span> PELICAN VELO CLUB</span><span class="footer-tip" id="ride-footer" hidden>回到公路 <kbd>R</kbd> <span></span> 暂停 <kbd>Space</kbd></span></footer>
     </main>
     <script type="module" src="/src/main.js"></script>
   </body>

@@ -103,11 +103,41 @@ const fragmentShader = /* glsl */ `
 `;
 
 const palettes = {
-  day: ['#76d3b1', '#2fa9ad', '#357da6', '#caf9e1', '#f1ffdf'],
-  sunset: ['#75baad', '#4b91a6', '#496c99', '#ffe0ad', '#f6ecd1'],
+  coast: {
+    day: ['#76d3b1', '#2fa9ad', '#357da6', '#caf9e1', '#f1ffdf'],
+    sunset: ['#75baad', '#4b91a6', '#496c99', '#ffe0ad', '#f6ecd1'],
+  },
+  harbor: {
+    day: ['#a7dac2', '#4bb7bc', '#527eaa', '#e3f7df', '#fff5da'],
+    sunset: ['#a9b9b3', '#6b94ae', '#776c9b', '#ffe3bc', '#fbe7cb'],
+  },
+  basalt: {
+    day: ['#6f9eb7', '#437f9f', '#385b8d', '#b7e3e8', '#dcecf1'],
+    sunset: ['#6c8da9', '#517393', '#544e86', '#efd2ad', '#dddce6'],
+  },
 };
 
-export function createWater(outline, level) {
+const weatherTints = {
+  night: {
+    colors: ['#142c47', '#153654', '#152847', '#83a5c0', '#88aac4'],
+    weight: 0.96,
+  },
+  cloudy: {
+    colors: ['#8faeb2', '#749aa6', '#687e97', '#c5d9de', '#d3e5e4'],
+    weight: 0.57,
+  },
+  rain: {
+    colors: ['#698d9a', '#597c8d', '#485e7c', '#aac3cb', '#b9cdd3'],
+    weight: 0.75,
+  },
+  mist: {
+    colors: ['#9bbec1', '#8bb2bb', '#889eb1', '#c2d7d9', '#deebe7'],
+    weight: 0.70,
+  },
+};
+
+export function createWater(outline, level, mapId = 'coast') {
+  const mapPalette = palettes[mapId] ?? palettes.coast;
   const paletteKeys = ['shallows', 'lagoon', 'offshore', 'glints', 'foam'];
   const uniforms = THREE.UniformsUtils.merge([
     THREE.UniformsLib.fog,
@@ -134,11 +164,16 @@ export function createWater(outline, level) {
   water.name = 'Animated coastal water';
 
   let previousWeather;
+  const tintColor = new THREE.Color();
   function update(time, weather) {
     uniforms.time.value = time;
     if (weather === previousWeather) return;
-    const palette = weather === 'sunset' ? palettes.sunset : palettes.day;
-    for (let i = 0; i < paletteKeys.length; i += 1) uniforms[paletteKeys[i]].value.set(palette[i]);
+    const palette = weather === 'sunset' ? mapPalette.sunset : mapPalette.day;
+    const tint = weatherTints[weather];
+    for (let i = 0; i < paletteKeys.length; i += 1) {
+      const color = uniforms[paletteKeys[i]].value.set(palette[i]);
+      if (tint) color.lerp(tintColor.set(tint.colors[i]), tint.weight);
+    }
     previousWeather = weather;
   }
 
